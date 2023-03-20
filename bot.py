@@ -12,6 +12,10 @@ from thread_pool import ThreadPool
 
 logger = logging.getLogger("teamup-bot")
 
+class GPTStream:
+    def __init__(self, role, content) -> None:
+        self.role = role
+        self.content = content
 
 class BaseBot:
     def __init__(self, service):
@@ -66,19 +70,79 @@ class BaseBot:
 
 
 class TextBot(BaseBot):
+
+    def __init__(self, service):
+        self.user_chat_dict = dict()
+        b =[]
+        super(TextBot, self).__init__(service)
+        self.buttons = [
+            {"type": "text", "id": "refresh", "button_text": "새로운 대화시작", "response_text": "새로운 대화시작"}
+        ]
+        self.test_extras = {
+            "2": {
+                'type': 'bot',
+                'scroll_buttons': self.buttons
+            }
+        }
+
     def handle_entered_room(self, team_index, room_index):
         logger.debug("Text Bot대화방에 진입")
-        self.service.post_chat(team_index, room_index, "안녕하세요. 저는 ChatGPT 봇입니다.")
+        self.service.post_chat(team_index, room_index, "안녕하세요. 저는 ESTSoft 챗GPT 봇입니다.", self.test_extras)
 
     def handle_chat(self, team_index, room_index, chat):
-        #if chat and chat.content == "Hello":
-        #    self.service.post_chat(team_index, room_index, "World")
-        if chat:
+        extras = {
+                    "2": {
+                    'type': 'bot',
+                    'scroll_buttons': self.buttons
+                }
+            }
+        if hasattr(chat,'response_id') and chat.response_id == "refresh":
+            if chat.user_index in self.user_chat_dict:
+                self.user_chat_dict[chat.user_index].clear()
+                logger.debug("\n user_idx= {key} 대화 초기화함.".format(key=chat.user_index))
+            self.service.post_chat(team_index, room_index, "새로운 주제로 대화를 시작해 보겠습니다.", self.test_extras)
+        elif chat:
+            if chat.user_index in self.user_chat_dict:
+                self.user_chat_dict[chat.user_index].append(GPTStream('user', chat.content)) 
+            else:
+                self.user_chat_dict[chat.user_index] = [GPTStream('user', chat.content)]
+
             openAIGpt = OpenAIGpt()
-            response = openAIGpt.run(chat.content)
-            logger.debug(response)
-            self.service.post_chat(team_index, room_index, response)
-            
+            response = openAIGpt.run(self.user_chat_dict[chat.user_index])
+
+            logger.debug('user_idx: ' + str(chat.user_index) + ' 질문: ' + chat.content)
+            logger.debug('user_idx: ' + str(chat.user_index) + ' 답변: ' + response)
+
+            if chat.user_index in self.user_chat_dict:
+                self.user_chat_dict[chat.user_index].append(GPTStream('assistant', response)) 
+            else:
+                self.user_chat_dict[chat.user_index].append(GPTStream('assistant', response)) 
+
+            for key, vals in self.user_chat_dict.items():
+                logger.debug("\n user_idx= {key}".format(key=key))
+                for gpt_item in vals:
+                    logger.debug("role={value1}, content={value2}".format(value1=gpt_item.role, value2=gpt_item.content))
+            logger.debug('\n\n')
+
+            self.service.post_chat(team_index, room_index, response, self.test_extras)
+
+                   
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 class ButtonBot(BaseBot):
     def __init__(self, service):

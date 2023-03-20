@@ -83,6 +83,7 @@ class TeamUpService:
 
         response = requests.post(url=auth_host + "/oauth2/token",
                                  headers=headers,
+                                 verify=False,
                                  data=auth_dict)
 
         logger.debug(response.json())
@@ -165,6 +166,7 @@ class TeamUpService:
     def get_my_index(self):
         my_info_response = self.client.get(
             auth_host + '/v1/user',
+            verify=False,
             timeout=self.config['lp_wait_timeout']
         )
         if my_info_response.status_code == 200:
